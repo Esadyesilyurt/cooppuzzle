@@ -16,26 +16,42 @@ public class GameLobbyController : MonoBehaviour
     [SerializeField] private string hostPlayerDefaultName = "Host Oyuncu";
     [SerializeField] private string waitingText = "Bekleniyor...";
 
-    private string _currentRoomCode;
     private const int RoomCodeLength = 4;
     private const string RoomCodeAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+    [Header("Networking (NGO + UGS)")]
+    [SerializeField] private CoopPuzzle.Lobby.LobbyCoordinator lobbyCoordinator;
+    [SerializeField] private TextMeshProUGUI statusText;
 
     private void Awake()
     {
         EnsureArraySize();
+
+        if (lobbyCoordinator == null)
+            lobbyCoordinator = FindFirstObjectByType<CoopPuzzle.Lobby.LobbyCoordinator>();
     }
 
     public void HostLobby()
     {
-        _currentRoomCode = GenerateRoomCode(RoomCodeLength);
-
-        if (hostRoomCodeText != null)
-            hostRoomCodeText.text = _currentRoomCode;
-
         ResetHostPlayerList();
 
         if (hostPlayerNameTexts != null && hostPlayerNameTexts.Length > 0 && hostPlayerNameTexts[0] != null)
             hostPlayerNameTexts[0].text = hostPlayerDefaultName;
+
+        if (lobbyCoordinator == null)
+        {
+            SetStatus("LobbyCoordinator bulunamadı. Sahneye eklemeliyiz.");
+            return;
+        }
+
+        _ = lobbyCoordinator.HostAsync(
+            playerName: hostPlayerDefaultName,
+            onLobbyUpdated: lobby =>
+            {
+                if (hostRoomCodeText != null)
+                    hostRoomCodeText.text = lobby.LobbyCode;
+            }
+        );
     }
 
     public void JoinLobby()
@@ -43,30 +59,43 @@ public class GameLobbyController : MonoBehaviour
         var code = (joinRoomCodeInput != null ? joinRoomCodeInput.text : string.Empty).Trim().ToUpperInvariant();
         var playerName = (joinPlayerNameInput != null ? joinPlayerNameInput.text : string.Empty).Trim();
 
-        if (string.IsNullOrEmpty(_currentRoomCode))
+        if (lobbyCoordinator == null)
         {
-            Debug.Log("Önce HostLobby() ile oda oluşturulmalı (mock).");
+            SetStatus("LobbyCoordinator bulunamadı. Sahneye eklemeliyiz.");
             return;
         }
 
-        if (!string.Equals(code, _currentRoomCode, StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrEmpty(code) || code.Length < RoomCodeLength)
         {
-            Debug.Log("Hatalı Kod");
+            SetStatus("Geçersiz oda kodu.");
             return;
         }
 
         if (string.IsNullOrWhiteSpace(playerName))
             playerName = "Oyuncu";
 
-        var slot = FindNextAvailableSlotIndex();
-        if (slot < 0)
-        {
-            Debug.Log("Lobi dolu (mock).");
-            return;
-        }
+        _ = lobbyCoordinator.JoinAsync(
+            lobbyCode: code,
+            playerName: playerName,
+            onLobbyUpdated: lobby =>
+            {
+                if (hostPlayerNameTexts == null) return;
+                if (lobby.Players == null) return;
 
-        if (hostPlayerNameTexts[slot] != null)
-            hostPlayerNameTexts[slot].text = playerName;
+                ResetHostPlayerList();
+                for (int i = 0; i < Mathf.Min(hostPlayerNameTexts.Length, lobby.Players.Count); i++)
+                {
+                    var t = hostPlayerNameTexts[i];
+                    if (t == null) continue;
+
+                    var p = lobby.Players[i];
+                    if (p?.Data != null && p.Data.TryGetValue(CoopPuzzle.Lobby.LobbyConstants.PlayerNameKey, out var nameObj))
+                        t.text = nameObj.Value;
+                    else
+                        t.text = "Oyuncu";
+                }
+            }
+        );
     }
 
     private void ResetHostPlayerList()
@@ -108,6 +137,14 @@ public class GameLobbyController : MonoBehaviour
         }
 
         return new string(chars);
+    }
+
+    private void SetStatus(string message)
+    {
+        if (statusText != null)
+            statusText.text = message;
+        else
+            Debug.Log(message);
     }
 
     private void EnsureArraySize()
