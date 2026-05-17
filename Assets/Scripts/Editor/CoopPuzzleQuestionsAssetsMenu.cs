@@ -7,6 +7,19 @@ namespace CoopPuzzle.EditorTools
 {
     public static class CoopPuzzleQuestionsAssetsMenu
     {
+        [MenuItem("Tools/CoopPuzzle/Sage/Create Master Document Asset")]
+        public static void CreateMasterDocument()
+        {
+            const string folder = "Assets/ScriptableObjects/Sage";
+            EnsureFolder(folder);
+            var path = AssetDatabase.GenerateUniqueAssetPath($"{folder}/SageMasterDocument.asset");
+            var doc = ScriptableObject.CreateInstance<SageMasterDocument>();
+            AssetDatabase.CreateAsset(doc, path);
+            AssetDatabase.SaveAssets();
+            EditorUtility.DisplayDialog("CoopPuzzle", $"Ana Bilge belgesi:\n{path}", "OK");
+            Selection.activeObject = doc;
+        }
+
         [MenuItem("Tools/CoopPuzzle/Questions/Create Sample Question Database")]
         public static void CreateSampleDatabase()
         {

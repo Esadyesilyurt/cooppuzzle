@@ -18,6 +18,9 @@ namespace CoopPuzzle.EditorTools
         [MenuItem("Tools/CoopPuzzle/Setup/Phase 2 Setup (One Click)")]
         public static void SetupPhase2()
         {
+            if (CoopPuzzleEditorPlayModeGuard.BlockIfPlaying("Phase 2 Setup"))
+                return;
+
             EnsureFolder("Assets/Scenes");
             EnsureFolder("Assets/ScriptableObjects/Questions");
             EnsureFolder("Assets/Prefabs");

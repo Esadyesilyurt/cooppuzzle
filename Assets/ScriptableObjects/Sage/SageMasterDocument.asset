@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e7d96d656eb53f642b11de517f563f1a, type: 3}
+  m_Name: SageMasterDocument
+  m_EditorClassIdentifier: Assembly-CSharp::CoopPuzzle.Questions.SageMasterDocument
+  title: "Bilge El Kitab\u0131"
+  bodyText: 
+  externalTextFile: {fileID: 4900000, guid: a8af22b2ef6e0024e9b0b8c22367d066, type: 3}

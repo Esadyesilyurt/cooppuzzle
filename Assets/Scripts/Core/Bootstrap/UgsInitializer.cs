@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Unity.Services.Authentication;
 using Unity.Services.Core;
@@ -7,6 +8,8 @@ namespace CoopPuzzle.Core.Bootstrap
 {
     public sealed class UgsInitializer : MonoBehaviour
     {
+        private const int InitTimeoutSeconds = 45;
+
         public static bool IsInitialized { get; private set; }
 
         private Task _initTask;
@@ -18,15 +21,15 @@ namespace CoopPuzzle.Core.Bootstrap
 
         private void Start()
         {
-            _initTask = InitializeIfNeededAsync();
+            _ = InitializeIfNeededAsync();
         }
 
         public Task InitializeIfNeededAsync()
         {
             if (IsInitialized) return Task.CompletedTask;
 
-            // Prevent duplicate inits if multiple instances exist.
-            if (_initTask != null) return _initTask;
+            if (_initTask != null && !_initTask.IsFaulted && !_initTask.IsCanceled)
+                return _initTask;
 
             _initTask = InitializeAsync();
             return _initTask;
@@ -34,12 +37,43 @@ namespace CoopPuzzle.Core.Bootstrap
 
         private static async Task InitializeAsync()
         {
-            await UnityServices.InitializeAsync();
+            try
+            {
+                if (UnityServices.State != ServicesInitializationState.Initialized)
+                    await WithTimeout(UnityServices.InitializeAsync(), InitTimeoutSeconds, "Unity Services Initialize");
 
-            if (!AuthenticationService.Instance.IsSignedIn)
-                await AuthenticationService.Instance.SignInAnonymouslyAsync();
+                if (!AuthenticationService.Instance.IsSignedIn)
+                    await WithTimeout(AuthenticationService.Instance.SignInAnonymouslyAsync(), InitTimeoutSeconds, "Anonymous Sign-In");
 
-            IsInitialized = true;
+                IsInitialized = true;
+                Debug.Log($"[UGS] Hazır. PlayerId={AuthenticationService.Instance.PlayerId}");
+            }
+            catch (TimeoutException)
+            {
+                IsInitialized = false;
+                throw;
+            }
+            catch (Exception ex)
+            {
+                IsInitialized = false;
+                Debug.LogError($"[UGS] Başlatılamadı: {ex.Message}");
+                Debug.LogException(ex);
+                throw;
+            }
+        }
+
+        private static async Task WithTimeout(Task task, int timeoutSeconds, string label)
+        {
+            var delay = Task.Delay(TimeSpan.FromSeconds(timeoutSeconds));
+            var completed = await Task.WhenAny(task, delay);
+            if (completed != task)
+            {
+                var msg = $"{label} zaman aşımı ({timeoutSeconds}s). İnternet ve Dashboard ayarlarını kontrol et.";
+                Debug.LogError($"[UGS] {msg}");
+                throw new TimeoutException(msg);
+            }
+
+            await task;
         }
     }
 }

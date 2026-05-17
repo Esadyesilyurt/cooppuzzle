@@ -22,8 +22,10 @@ public sealed class LobbyUIManager : MonoBehaviour
     public void OpenHostPanel()
     {
         SetActive(mainMenuPanel, false);
-        SetActive(hostPanel, true);
         SetActive(joinPanel, false);
+        SetActive(hostPanel, true);
+        BringToFront(hostPanel);
+
     }
 
     public void OpenJoinPanel()
@@ -31,6 +33,16 @@ public sealed class LobbyUIManager : MonoBehaviour
         SetActive(mainMenuPanel, false);
         SetActive(hostPanel, false);
         SetActive(joinPanel, true);
+        BringToFront(joinPanel);
+
+        var lobby = FindAnyObjectByType<GameLobbyController>();
+        lobby?.PrepareJoinPanel();
+    }
+
+    private static void BringToFront(GameObject panel)
+    {
+        if (panel == null) return;
+        panel.transform.SetAsLastSibling();
     }
 
     private static void SetActive(GameObject go, bool isActive)

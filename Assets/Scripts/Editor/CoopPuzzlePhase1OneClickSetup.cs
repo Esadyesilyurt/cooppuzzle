@@ -43,6 +43,21 @@ namespace CoopPuzzle.EditorTools
             }
         }
 
+        [MenuItem("Tools/CoopPuzzle/Setup/Check Unity Cloud Link (UGS)")]
+        public static void CheckUnityCloudLink()
+        {
+            if (UgsProjectLinkEditor.IsLinked)
+            {
+                EditorUtility.DisplayDialog(
+                    "CoopPuzzle - UGS",
+                    $"Proje Cloud'a bağlı.\nProject ID: {PlayerSettings.cloudProjectId}",
+                    "OK");
+                return;
+            }
+
+            EditorUtility.DisplayDialog("CoopPuzzle - UGS", UgsProjectLinkEditor.GetLinkInstructions(), "OK");
+        }
+
         [MenuItem("Tools/CoopPuzzle/Setup/Configure Mobile (Landscape)")]
         public static void ConfigureLandscapeMobile()
         {

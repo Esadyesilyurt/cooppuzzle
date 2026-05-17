@@ -33,7 +33,18 @@ namespace CoopPuzzle.EditorTools
                 if (transport == null)
                     transport = Undo.AddComponent<UnityTransport>(networkManager.gameObject);
 
-                var bootstrap = FindOrCreateInScene<NetworkBootstrap>("_NetworkBootstrap");
+                {
+                    var nmSo = new SerializedObject(networkManager);
+                    var configProp = nmSo.FindProperty("NetworkConfig");
+                    var transportProp = configProp.FindPropertyRelative("NetworkTransport");
+                    transportProp.objectReferenceValue = transport;
+                    nmSo.ApplyModifiedPropertiesWithoutUndo();
+                }
+
+                var bootstrap = networkManager.GetComponent<NetworkBootstrap>();
+                if (bootstrap == null)
+                    bootstrap = Undo.AddComponent<NetworkBootstrap>(networkManager.gameObject);
+
                 var coordinator = FindOrCreateInScene<LobbyCoordinator>("_LobbyCoordinator");
 
                 // Wire LobbyCoordinator deps.
@@ -63,6 +74,10 @@ namespace CoopPuzzle.EditorTools
                     var so = new SerializedObject(gameLobbyController);
                     so.FindProperty("lobbyCoordinator").objectReferenceValue = coordinator;
                     so.FindProperty("statusText").objectReferenceValue = FindStatusTextCandidate();
+                    so.FindProperty("joinRoomCodeInput").objectReferenceValue =
+                        FindInputFieldCandidate("OdaKodu", "LobbyCode", "JoinCode");
+                    so.FindProperty("joinPlayerNameInput").objectReferenceValue =
+                        FindInputFieldCandidate("Isim", "PlayerName", "OyuncuAdi");
                     so.ApplyModifiedPropertiesWithoutUndo();
                 }
 
@@ -90,10 +105,26 @@ namespace CoopPuzzle.EditorTools
             return Undo.AddComponent<T>(go);
         }
 
+        private static TMP_InputField FindInputFieldCandidate(params string[] names)
+        {
+            foreach (var input in UnityEngine.Object.FindObjectsByType<TMP_InputField>(FindObjectsInactive.Include))
+            {
+                if (input == null) continue;
+                var n = (input.gameObject.name ?? string.Empty).Trim();
+                foreach (var candidate in names)
+                {
+                    if (string.Equals(n, candidate, StringComparison.OrdinalIgnoreCase))
+                        return input;
+                }
+            }
+
+            return null;
+        }
+
         private static TextMeshProUGUI FindStatusTextCandidate()
         {
             // Try common names first (fast path).
-            foreach (var t in UnityEngine.Object.FindObjectsByType<TextMeshProUGUI>(FindObjectsInactive.Exclude))
+            foreach (var t in UnityEngine.Object.FindObjectsByType<TextMeshProUGUI>(FindObjectsInactive.Include))
             {
                 if (t == null) continue;
                 var n = (t.gameObject.name ?? string.Empty).Trim();

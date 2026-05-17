@@ -81,6 +81,14 @@ namespace CoopPuzzle.Lobby
             _ = HeartbeatLoopAsync(CurrentLobby.Id, TimeSpan.FromSeconds(intervalSeconds), _heartbeatCts.Token);
         }
 
+        public Player GetLocalPlayer()
+        {
+            if (CurrentLobby?.Players == null) return null;
+
+            var localId = Unity.Services.Authentication.AuthenticationService.Instance.PlayerId;
+            return CurrentLobby.Players.Find(p => p.Id == localId);
+        }
+
         public void StopHeartbeat()
         {
             _heartbeatCts?.Cancel();
@@ -95,6 +103,22 @@ namespace CoopPuzzle.Lobby
 
             _pollCts = new CancellationTokenSource();
             _ = PollLoopAsync(CurrentLobby.Id, TimeSpan.FromSeconds(intervalSeconds), _pollCts.Token, onLobbyUpdated);
+        }
+
+        public async Task<LobbyModel> RefreshLobbyAsync()
+        {
+            if (CurrentLobby == null) return null;
+
+            try
+            {
+                CurrentLobby = await Lobbies.Instance.GetLobbyAsync(CurrentLobby.Id);
+                return CurrentLobby;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Lobby Refresh hata: {ex}");
+                throw;
+            }
         }
 
         public void StopPolling()
@@ -128,13 +152,14 @@ namespace CoopPuzzle.Lobby
             }
         }
 
-        private static async Task PollLoopAsync(string lobbyId, TimeSpan interval, CancellationToken ct, Action<LobbyModel> onLobbyUpdated)
+        private async Task PollLoopAsync(string lobbyId, TimeSpan interval, CancellationToken ct, Action<LobbyModel> onLobbyUpdated)
         {
             while (!ct.IsCancellationRequested)
             {
                 try
                 {
                     var lobby = await Lobbies.Instance.GetLobbyAsync(lobbyId);
+                    CurrentLobby = lobby;
                     onLobbyUpdated?.Invoke(lobby);
                 }
                 catch (Exception ex)
