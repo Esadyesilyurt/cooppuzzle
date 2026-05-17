@@ -39,6 +39,15 @@ namespace CoopPuzzle.Lobby
 
         public async Task<LobbyModel> JoinLobbyByCodeAsync(string lobbyCode, Dictionary<string, PlayerDataObject> playerData)
         {
+            var normalizedCode = LobbyConstants.NormalizeLobbyCode(lobbyCode);
+
+            if (CurrentLobby != null &&
+                string.Equals(CurrentLobby.LobbyCode, normalizedCode, StringComparison.OrdinalIgnoreCase))
+            {
+                CurrentLobby = await Lobbies.Instance.GetLobbyAsync(CurrentLobby.Id);
+                return CurrentLobby;
+            }
+
             try
             {
                 var options = new JoinLobbyByCodeOptions
@@ -46,14 +55,68 @@ namespace CoopPuzzle.Lobby
                     Player = new Player { Data = playerData }
                 };
 
-                CurrentLobby = await Lobbies.Instance.JoinLobbyByCodeAsync(lobbyCode, options);
+                CurrentLobby = await Lobbies.Instance.JoinLobbyByCodeAsync(normalizedCode, options);
                 return CurrentLobby;
+            }
+            catch (LobbyServiceException ex) when (IsAlreadyMemberError(ex))
+            {
+                var existing = await TryResolveJoinedLobbyByCodeAsync(normalizedCode);
+                if (existing != null)
+                {
+                    CurrentLobby = existing;
+                    return CurrentLobby;
+                }
+
+                Debug.LogWarning($"Lobby JoinByCode: zaten üye ama lobby bulunamadı ({normalizedCode}).");
+                throw;
             }
             catch (Exception ex)
             {
                 Debug.LogError($"Lobby JoinByCode hata: {ex}");
                 throw;
             }
+        }
+
+        public void Shutdown()
+        {
+            StopPolling();
+            StopHeartbeat();
+        }
+
+        private static bool IsAlreadyMemberError(LobbyServiceException ex)
+        {
+            if (ex.Reason is LobbyExceptionReason.Conflict or LobbyExceptionReason.LobbyConflict)
+                return true;
+
+            var msg = ex.Message ?? string.Empty;
+            return msg.IndexOf("already a member", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static async Task<LobbyModel> TryResolveJoinedLobbyByCodeAsync(string lobbyCode)
+        {
+            var joinedIds = await Lobbies.Instance.GetJoinedLobbiesAsync();
+            if (joinedIds == null || joinedIds.Count == 0)
+                return null;
+
+            foreach (var lobbyId in joinedIds)
+            {
+                if (string.IsNullOrEmpty(lobbyId)) continue;
+
+                LobbyModel lobby;
+                try
+                {
+                    lobby = await Lobbies.Instance.GetLobbyAsync(lobbyId);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (string.Equals(lobby.LobbyCode, lobbyCode, StringComparison.OrdinalIgnoreCase))
+                    return lobby;
+            }
+
+            return null;
         }
 
         public async Task UpdateLobbyDataAsync(Dictionary<string, DataObject> data)

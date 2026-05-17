@@ -1,3 +1,4 @@
+using System;
 using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -22,7 +23,7 @@ namespace CoopPuzzle.EditorTools
             Undo.IncrementCurrentGroup();
             Undo.SetCurrentGroupName("Fix Lobby UI");
 
-            var canvas = Object.FindAnyObjectByType<Canvas>();
+            var canvas = UnityEngine.Object.FindAnyObjectByType<Canvas>();
             if (canvas == null)
             {
                 EditorUtility.DisplayDialog("CoopPuzzle", "Canvas bulunamadı.", "OK");
@@ -33,7 +34,10 @@ namespace CoopPuzzle.EditorTools
             var gameLobby = canvas.GetComponent<GameLobbyController>();
 
             MakeTextReadable(FindTmpByName("KOD: XXXX"), 42f);
-            var odaKodu = FindInputByName("OdaKodu");
+            var lobipanel = FindGo("lobipanel");
+            var odaKodu = FindMainMenuOdaKodu(lobipanel) ?? EnsureMainMenuOdaKodu(lobipanel);
+            if (odaKodu == null)
+                odaKodu = FindInputByName("OdaKodu");
             if (odaKodu != null)
             {
                 if (odaKodu.textComponent != null)
@@ -49,6 +53,8 @@ namespace CoopPuzzle.EditorTools
 
             var durum = FindTmpByName("Durum") ?? CreateStatusText(canvas.transform);
             MakeTextReadable(durum, 28f);
+
+            WireMainMenuJoinButton(gameLobby);
 
             if (gameLobby != null)
             {
@@ -66,13 +72,13 @@ namespace CoopPuzzle.EditorTools
 
             EditorUtility.DisplayDialog(
                 "CoopPuzzle",
-                "Lobby UI düzeltildi.\n\n- KOD metni beyaz / büyük\n- OdaKodu okunaklı\n- Durum metni eklendi/bağlandı\n\nSahneyi kaydet (Ctrl+S).",
+                "Lobby UI düzeltildi.\n\n- Ana menüde OdaKodu alanı\n- lobi bağlan → doğrudan katıl\n- KOD metni beyaz / büyük\n\nSahneyi kaydet (Ctrl+S).",
                 "OK");
         }
 
         private static GameObject FindGo(string name)
         {
-            foreach (var t in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include))
+            foreach (var t in UnityEngine.Object.FindObjectsByType<Transform>(FindObjectsInactive.Include))
             {
                 if (t != null && t.gameObject.name == name)
                     return t.gameObject;
@@ -82,7 +88,7 @@ namespace CoopPuzzle.EditorTools
 
         private static TextMeshProUGUI FindTmpByName(string name)
         {
-            foreach (var t in Object.FindObjectsByType<TextMeshProUGUI>(FindObjectsInactive.Include))
+            foreach (var t in UnityEngine.Object.FindObjectsByType<TextMeshProUGUI>(FindObjectsInactive.Include))
             {
                 if (t != null && t.gameObject.name == name)
                     return t;
@@ -92,7 +98,7 @@ namespace CoopPuzzle.EditorTools
 
         private static TMP_InputField FindInputByName(string name)
         {
-            foreach (var i in Object.FindObjectsByType<TMP_InputField>(FindObjectsInactive.Include))
+            foreach (var i in UnityEngine.Object.FindObjectsByType<TMP_InputField>(FindObjectsInactive.Include))
             {
                 if (i != null && i.gameObject.name == name)
                     return i;
@@ -115,6 +121,53 @@ namespace CoopPuzzle.EditorTools
             tmp.text = "Lobby durumu";
             tmp.alignment = TextAlignmentOptions.Center;
             return tmp;
+        }
+
+        private static TMP_InputField FindMainMenuOdaKodu(GameObject lobipanel)
+        {
+            if (lobipanel == null) return null;
+            foreach (var i in lobipanel.GetComponentsInChildren<TMP_InputField>(true))
+            {
+                if (i != null && i.gameObject.name.IndexOf("OdaKodu", StringComparison.OrdinalIgnoreCase) >= 0)
+                    return i;
+            }
+            return null;
+        }
+
+        private static TMP_InputField EnsureMainMenuOdaKodu(GameObject lobipanel)
+        {
+            if (lobipanel == null) return null;
+            var existing = FindMainMenuOdaKodu(lobipanel);
+            if (existing != null) return existing;
+
+            var input = LobbyUiFactory.CreateOdaKoduInput(
+                lobipanel.transform,
+                new Vector2(0f, 360f),
+                new Vector2(520f, 90f));
+            Undo.RegisterCreatedObjectUndo(input.gameObject, "Create main menu OdaKodu");
+            return input;
+        }
+
+        private static void WireMainMenuJoinButton(GameLobbyController gameLobby)
+        {
+            if (gameLobby == null) return;
+            foreach (var b in UnityEngine.Object.FindObjectsByType<Button>(FindObjectsInactive.Include))
+            {
+                if (b == null) continue;
+                var n = b.gameObject.name ?? string.Empty;
+                if (!n.Contains("lobi", StringComparison.OrdinalIgnoreCase)) continue;
+                if (!n.Contains("bağlan", StringComparison.OrdinalIgnoreCase) &&
+                    !n.Contains("baglan", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                Undo.RecordObject(b, "Wire lobi bağlan");
+                var onClick = b.onClick;
+                for (int i = onClick.GetPersistentEventCount() - 1; i >= 0; i--)
+                    UnityEditor.Events.UnityEventTools.RemovePersistentListener(onClick, i);
+                UnityEditor.Events.UnityEventTools.AddPersistentListener(onClick, gameLobby.JoinLobby);
+                EditorUtility.SetDirty(b);
+                return;
+            }
         }
 
         private static void MakeTextReadable(TMP_Text tmp, float fontSize, Color? color = null)

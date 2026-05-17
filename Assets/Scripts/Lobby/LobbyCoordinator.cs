@@ -48,10 +48,18 @@ namespace CoopPuzzle.Lobby
             RelayService ??= new RelayServiceFacade();
         }
 
+        private void OnApplicationQuit() => ShutdownLobbySession();
+
         private void OnDestroy()
         {
+            ShutdownLobbySession();
             if (Instance == this)
                 Instance = null;
+        }
+
+        private void ShutdownLobbySession()
+        {
+            LobbyService?.Shutdown();
         }
 
         public async Task HostAsync(string playerName, Action<LobbyModel> onLobbyUpdated = null)
@@ -103,8 +111,20 @@ namespace CoopPuzzle.Lobby
                 SetStatus("Servisler hazırlanıyor...");
                 await EnsureInitializedAsync();
 
+                var normalizedCode = LobbyConstants.NormalizeLobbyCode(lobbyCode);
+                var alreadyInLobby = LobbyService.CurrentLobby != null &&
+                    string.Equals(LobbyService.CurrentLobby.LobbyCode, normalizedCode, StringComparison.OrdinalIgnoreCase);
+                var networkActive = networkBootstrap != null && networkBootstrap.IsConnected;
+
+                if (alreadyInLobby && networkActive)
+                {
+                    SetStatus($"Zaten bu lobidesin ({normalizedCode}).");
+                    LobbyService.StartPolling(onLobbyUpdated: onLobbyUpdated);
+                    return;
+                }
+
                 SetStatus("Lobby'ye katılınıyor...");
-                var lobby = await LobbyService.JoinLobbyByCodeAsync(lobbyCode, BuildPlayerData(playerName));
+                var lobby = await LobbyService.JoinLobbyByCodeAsync(normalizedCode, BuildPlayerData(playerName));
 
                 LobbyService.StartPolling(onLobbyUpdated: onLobbyUpdated);
 

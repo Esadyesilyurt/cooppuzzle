@@ -27,14 +27,17 @@ public class GameLobbyController : MonoBehaviour
 
     private bool _joinInputsConfigured;
     private bool _isJoining;
+    private string _lastHostCodeLogged;
     private TextMeshProUGUI _runtimeStatusText;
 
     private void Awake()
     {
         EnsureArraySize();
+        EnsureMainMenuLobbyCodeInput();
         ResolveAllReferences();
         ConfigureJoinInputs();
         ResolveJoinButton();
+        WireMainMenuJoinButton();
         EnsureReadableHostCodeStyle();
         EnsureReadableJoinInputStyle();
 
@@ -195,7 +198,11 @@ public class GameLobbyController : MonoBehaviour
                 onLobbyUpdated: lobby =>
                 {
                     ShowHostCode(lobby.LobbyCode, loading: false);
-                    SetStatus($"Lobi hazır! Kod: {lobby.LobbyCode}");
+                    if (!string.Equals(_lastHostCodeLogged, lobby.LobbyCode, StringComparison.Ordinal))
+                    {
+                        _lastHostCodeLogged = lobby.LobbyCode;
+                        SetStatus($"Lobi hazır! Kod: {lobby.LobbyCode}");
+                    }
                 }
             );
         }
@@ -294,8 +301,8 @@ public class GameLobbyController : MonoBehaviour
 
         if (hostRoomCodeText == null)
             hostRoomCodeText = FindUiText("KOD");
-        if (joinRoomCodeInput == null)
-            joinRoomCodeInput = FindInputField("OdaKodu");
+        if (joinRoomCodeInput == null || !IsOnMainMenu(joinRoomCodeInput))
+            joinRoomCodeInput = FindMainMenuCodeInput() ?? joinRoomCodeInput ?? FindInputField("OdaKodu");
         if (joinPlayerNameInput == null)
             joinPlayerNameInput = FindInputField("Isim");
         if (statusText == null)
@@ -391,15 +398,92 @@ public class GameLobbyController : MonoBehaviour
         {
             if (b == null) continue;
             var n = b.gameObject.name ?? string.Empty;
-            if (n.Contains("Bağlan", StringComparison.OrdinalIgnoreCase) ||
-                n.Contains("Baglan", StringComparison.OrdinalIgnoreCase) ||
-                n.Contains("Katil", StringComparison.OrdinalIgnoreCase) ||
-                n.Contains("Join", StringComparison.OrdinalIgnoreCase))
+            if (IsMainMenuJoinButtonName(n))
+                continue;
+            if (n.Equals("Bağlan", StringComparison.OrdinalIgnoreCase) ||
+                n.Equals("Baglan", StringComparison.OrdinalIgnoreCase))
             {
                 joinButton = b;
                 break;
             }
         }
+    }
+
+    private void EnsureMainMenuLobbyCodeInput()
+    {
+        var panel = FindMainMenuPanel();
+        if (panel == null) return;
+
+        var existing = FindMainMenuCodeInput();
+        if (existing != null)
+        {
+            joinRoomCodeInput = existing;
+            return;
+        }
+
+        joinRoomCodeInput = LobbyUiFactory.CreateOdaKoduInput(
+            panel.transform,
+            anchoredPosition: new Vector2(0f, 360f),
+            sizeDelta: new Vector2(520f, 90f));
+    }
+
+    private void WireMainMenuJoinButton()
+    {
+        foreach (var b in FindObjectsByType<Button>(FindObjectsInactive.Include))
+        {
+            if (b == null) continue;
+            if (!IsMainMenuJoinButtonName(b.gameObject.name)) continue;
+
+            b.onClick.RemoveAllListeners();
+            b.onClick.AddListener(OnMainMenuJoinClicked);
+            joinButton = b;
+            RefreshJoinButtonState();
+            return;
+        }
+    }
+
+    private void OnMainMenuJoinClicked()
+    {
+        ResolveAllReferences();
+        ConfigureJoinInputs();
+        TryJoinLobby();
+    }
+
+    private static bool IsMainMenuJoinButtonName(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return false;
+        return name.Contains("lobi", StringComparison.OrdinalIgnoreCase) &&
+               (name.Contains("bağlan", StringComparison.OrdinalIgnoreCase) ||
+                name.Contains("baglan", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static GameObject FindMainMenuPanel()
+    {
+        foreach (var t in FindObjectsByType<Transform>(FindObjectsInactive.Include))
+        {
+            if (t != null && string.Equals(t.gameObject.name, "lobipanel", StringComparison.OrdinalIgnoreCase))
+                return t.gameObject;
+        }
+        return null;
+    }
+
+    private static TMP_InputField FindMainMenuCodeInput()
+    {
+        var panel = FindMainMenuPanel();
+        if (panel == null) return null;
+        foreach (var input in panel.GetComponentsInChildren<TMP_InputField>(true))
+        {
+            if (input != null && input.gameObject.name.IndexOf("OdaKodu", StringComparison.OrdinalIgnoreCase) >= 0)
+                return input;
+        }
+        return null;
+    }
+
+    private static bool IsOnMainMenu(TMP_InputField input)
+    {
+        if (input == null) return false;
+        var panel = FindMainMenuPanel();
+        return panel != null && input.transform.IsChildOf(panel.transform);
     }
 
     private void RefreshJoinButtonState()

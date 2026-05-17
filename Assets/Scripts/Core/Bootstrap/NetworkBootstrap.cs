@@ -190,6 +190,10 @@ namespace CoopPuzzle.Core.Bootstrap
         public bool IsHostOrServer =>
             networkManager != null && (networkManager.IsHost || networkManager.IsServer);
 
+        public bool IsConnected =>
+            networkManager != null &&
+            (networkManager.IsClient || networkManager.IsHost || networkManager.IsServer);
+
         public bool LoadGameplayScene(string sceneName = null)
         {
             if (networkManager == null)
