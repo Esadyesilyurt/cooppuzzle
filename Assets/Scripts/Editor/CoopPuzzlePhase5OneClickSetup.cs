@@ -27,9 +27,10 @@ namespace CoopPuzzle.EditorTools
                 "Lobby → Oyun sahnesi akışı hazır.\n\n" +
                 "1) menü sahnesinde Host/Join\n" +
                 "2) Host UI'da bir butona GameLobbyController.StartGame bağla\n" +
-                "3) Tüm oyuncular SampleScene'e gider\n" +
-                "4) Rol: slot 0,2 Gezgin | 1,3 Bilge (varsayılan)\n\n" +
-                "ParrelSync: 4 editör ile tam test.",
+                "3) Host BAŞLAT (en az 2 oyuncu) → SampleScene\n" +
+                "4) Client'lar NGO ile aynı sahneye geçer\n" +
+                "5) Rol: lobby slotundan (0,2 Gezgin | 1,3 Bilge)\n\n" +
+                "Test: 2 Unity penceresi (host+client) yeterli.",
                 "OK");
         }
 

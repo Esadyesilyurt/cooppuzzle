@@ -1,6 +1,8 @@
+using CoopPuzzle.Gameplay.Core;
 using CoopPuzzle.Gameplay.Map;
 using CoopPuzzle.Gameplay.Player;
 using TopDownCameraFollow = CoopPuzzle.Gameplay.Camera.TopDownCameraFollow;
+using Unity.Netcode;
 using UnityEngine;
 
 namespace CoopPuzzle.Gameplay.Sage
@@ -13,13 +15,18 @@ namespace CoopPuzzle.Gameplay.Sage
 
         private void Start()
         {
-            if (bindOnStart)
-                BindTeamTraveler();
+            if (!bindOnStart)
+                return;
+
+            if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+                return;
+
+            BindTeamTraveler();
         }
 
         public void BindTeamTraveler()
         {
-            var traveler = FindTeamTraveler(team);
+            var traveler = TeamTravelerLookup.FindTransform(team);
             if (traveler == null)
             {
                 Debug.LogWarning($"SageSpectatorBootstrap: {team} Gezgini bulunamadı.");
@@ -28,18 +35,9 @@ namespace CoopPuzzle.Gameplay.Sage
 
             if (followCamera != null)
                 followCamera.SetTarget(traveler);
-        }
 
-        private static Transform FindTeamTraveler(SpawnTeam team)
-        {
-            foreach (var t in FindObjectsByType<TravelerMovementController>(FindObjectsInactive.Exclude))
-            {
-                var marker = t.GetComponent<TravelerTeamMarker>();
-                if (marker == null || marker.Team == team)
-                    return t.transform;
-            }
-
-            return null;
+            var router = FindAnyObjectByType<GameplayCameraRouter>();
+            router?.SetSageCameraTarget(traveler);
         }
 
         public void SetTeam(SpawnTeam spawnTeam) => team = spawnTeam;

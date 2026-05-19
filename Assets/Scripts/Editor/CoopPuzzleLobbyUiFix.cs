@@ -1,4 +1,5 @@
 using System;
+using CoopPuzzle.Lobby;
 using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -35,9 +36,8 @@ namespace CoopPuzzle.EditorTools
 
             MakeTextReadable(FindTmpByName("KOD: XXXX"), 42f);
             var lobipanel = FindGo("lobipanel");
-            var odaKodu = FindMainMenuOdaKodu(lobipanel) ?? EnsureMainMenuOdaKodu(lobipanel);
-            if (odaKodu == null)
-                odaKodu = FindInputByName("OdaKodu");
+            HideMainMenuOdaKodu(lobipanel);
+            var odaKodu = FindJoinPanelInput("OdaKodu");
             if (odaKodu != null)
             {
                 if (odaKodu.textComponent != null)
@@ -55,6 +55,9 @@ namespace CoopPuzzle.EditorTools
             MakeTextReadable(durum, 28f);
 
             WireMainMenuJoinButton(gameLobby);
+            WireJoinPanelButtons(gameLobby);
+            WirePanelBackButtons(gameLobby);
+            EnsureHostPanelController(hostPanel: FindGo("HostPanel"), gameLobby);
 
             if (gameLobby != null)
             {
@@ -62,7 +65,7 @@ namespace CoopPuzzle.EditorTools
                 so.FindProperty("lobbyUi").objectReferenceValue = lobbyUi;
                 so.FindProperty("hostRoomCodeText").objectReferenceValue = FindTmpByName("KOD: XXXX");
                 so.FindProperty("joinRoomCodeInput").objectReferenceValue = odaKodu;
-                so.FindProperty("joinPlayerNameInput").objectReferenceValue = FindInputByName("Isim");
+                so.FindProperty("joinPlayerNameInput").objectReferenceValue = FindJoinPanelInput("Isim");
                 so.FindProperty("statusText").objectReferenceValue = durum;
                 so.ApplyModifiedPropertiesWithoutUndo();
             }
@@ -72,7 +75,7 @@ namespace CoopPuzzle.EditorTools
 
             EditorUtility.DisplayDialog(
                 "CoopPuzzle",
-                "Lobby UI düzeltildi.\n\n- Ana menüde OdaKodu alanı\n- lobi bağlan → doğrudan katıl\n- KOD metni beyaz / büyük\n\nSahneyi kaydet (Ctrl+S).",
+                "Lobby UI düzeltildi.\n\n- lobi bağlan → JoinPanel\n- Bağlan → HostPanel (client)\n- KOD metni beyaz / büyük\n\nSahneyi kaydet (Ctrl+S).",
                 "OK");
         }
 
@@ -123,29 +126,93 @@ namespace CoopPuzzle.EditorTools
             return tmp;
         }
 
-        private static TMP_InputField FindMainMenuOdaKodu(GameObject lobipanel)
+        private static void HideMainMenuOdaKodu(GameObject lobipanel)
         {
-            if (lobipanel == null) return null;
+            if (lobipanel == null) return;
             foreach (var i in lobipanel.GetComponentsInChildren<TMP_InputField>(true))
             {
                 if (i != null && i.gameObject.name.IndexOf("OdaKodu", StringComparison.OrdinalIgnoreCase) >= 0)
+                    i.gameObject.SetActive(false);
+            }
+        }
+
+        private static TMP_InputField FindJoinPanelInput(string fieldName)
+        {
+            var joinPanel = FindGo("JoinPanel");
+            if (joinPanel == null) return null;
+            foreach (var i in joinPanel.GetComponentsInChildren<TMP_InputField>(true))
+            {
+                if (i != null && string.Equals(i.gameObject.name, fieldName, StringComparison.OrdinalIgnoreCase))
                     return i;
             }
             return null;
         }
 
-        private static TMP_InputField EnsureMainMenuOdaKodu(GameObject lobipanel)
+        private static void WirePanelBackButtons(GameLobbyController gameLobby)
         {
-            if (lobipanel == null) return null;
-            var existing = FindMainMenuOdaKodu(lobipanel);
-            if (existing != null) return existing;
+            if (gameLobby == null) return;
+            WireBackInPanel(FindGo("HostPanel"), gameLobby);
+            WireBackInPanel(FindGo("JoinPanel"), gameLobby);
+        }
 
-            var input = LobbyUiFactory.CreateOdaKoduInput(
-                lobipanel.transform,
-                new Vector2(0f, 360f),
-                new Vector2(520f, 90f));
-            Undo.RegisterCreatedObjectUndo(input.gameObject, "Create main menu OdaKodu");
-            return input;
+        private static void WireBackInPanel(GameObject panel, GameLobbyController gameLobby)
+        {
+            if (panel == null) return;
+            foreach (var b in panel.GetComponentsInChildren<Button>(true))
+            {
+                if (b == null) continue;
+                var n = b.gameObject.name ?? string.Empty;
+                if (!n.Contains("Geri", System.StringComparison.OrdinalIgnoreCase)
+                    && !n.Equals("Back", System.StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                Undo.RecordObject(b, "Wire panel Geri");
+                var onClick = b.onClick;
+                for (int i = onClick.GetPersistentEventCount() - 1; i >= 0; i--)
+                    UnityEditor.Events.UnityEventTools.RemovePersistentListener(onClick, i);
+                UnityEditor.Events.UnityEventTools.AddPersistentListener(onClick, gameLobby.ReturnToLobbyPanel);
+                EditorUtility.SetDirty(b);
+            }
+        }
+
+        private static void WireJoinPanelButtons(GameLobbyController gameLobby)
+        {
+            if (gameLobby == null) return;
+            var joinPanel = FindGo("JoinPanel");
+            if (joinPanel == null) return;
+
+            foreach (var b in joinPanel.GetComponentsInChildren<Button>(true))
+            {
+                if (b == null) continue;
+                var n = b.gameObject.name ?? string.Empty;
+
+                if (n.Equals("Bağlan", StringComparison.OrdinalIgnoreCase) ||
+                    n.Equals("Baglan", StringComparison.OrdinalIgnoreCase))
+                {
+                    Undo.RecordObject(b, "Wire JoinPanel Bağlan");
+                    var onClick = b.onClick;
+                    for (int i = onClick.GetPersistentEventCount() - 1; i >= 0; i--)
+                        UnityEditor.Events.UnityEventTools.RemovePersistentListener(onClick, i);
+                    UnityEditor.Events.UnityEventTools.AddPersistentListener(onClick, gameLobby.JoinLobby);
+                    EditorUtility.SetDirty(b);
+                }
+            }
+        }
+
+        private static void EnsureHostPanelController(GameObject hostPanel, GameLobbyController gameLobby)
+        {
+            if (hostPanel == null) return;
+
+            var hostUi = hostPanel.GetComponent<HostPanelController>();
+            if (hostUi == null)
+                hostUi = Undo.AddComponent<HostPanelController>(hostPanel);
+
+            if (gameLobby == null) return;
+            var so = new SerializedObject(hostUi);
+            so.FindProperty("gameLobby").objectReferenceValue = gameLobby;
+            so.FindProperty("lobbyCoordinator").objectReferenceValue =
+                UnityEngine.Object.FindAnyObjectByType<LobbyCoordinator>();
+            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         private static void WireMainMenuJoinButton(GameLobbyController gameLobby)
@@ -164,7 +231,7 @@ namespace CoopPuzzle.EditorTools
                 var onClick = b.onClick;
                 for (int i = onClick.GetPersistentEventCount() - 1; i >= 0; i--)
                     UnityEditor.Events.UnityEventTools.RemovePersistentListener(onClick, i);
-                UnityEditor.Events.UnityEventTools.AddPersistentListener(onClick, gameLobby.JoinLobby);
+                UnityEditor.Events.UnityEventTools.AddPersistentListener(onClick, gameLobby.OpenJoinMenu);
                 EditorUtility.SetDirty(b);
                 return;
             }

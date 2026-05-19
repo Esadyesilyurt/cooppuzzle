@@ -42,11 +42,10 @@ namespace CoopPuzzle.Core.Bootstrap
                 if (UnityServices.State != ServicesInitializationState.Initialized)
                     await WithTimeout(UnityServices.InitializeAsync(), InitTimeoutSeconds, "Unity Services Initialize");
 
-                if (!AuthenticationService.Instance.IsSignedIn)
-                    await WithTimeout(AuthenticationService.Instance.SignInAnonymouslyAsync(), InitTimeoutSeconds, "Anonymous Sign-In");
+                await EnsureSignedInWithInstanceProfileAsync();
 
                 IsInitialized = true;
-                Debug.Log($"[UGS] Hazır. PlayerId={AuthenticationService.Instance.PlayerId}");
+                Debug.Log($"[UGS] Hazır. Profile={GetInstanceProfileName()} PlayerId={AuthenticationService.Instance.PlayerId}");
             }
             catch (TimeoutException)
             {
@@ -60,6 +59,33 @@ namespace CoopPuzzle.Core.Bootstrap
                 Debug.LogException(ex);
                 throw;
             }
+        }
+
+        /// <summary>
+        /// Aynı makinede iki Unity örneği PlayerPrefs paylaştığı için varsayılan anonim oturum
+        /// aynı PlayerId üretir; host ile client çakışır. Editor/dev'de process başına profil kullan.
+        /// </summary>
+        public static string GetInstanceProfileName()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            return $"cooppuzzle_pid_{System.Diagnostics.Process.GetCurrentProcess().Id}";
+#else
+            return "cooppuzzle_main";
+#endif
+        }
+
+        private static async Task EnsureSignedInWithInstanceProfileAsync()
+        {
+            var profileName = GetInstanceProfileName();
+            AuthenticationService.Instance.SwitchProfile(profileName);
+
+            if (AuthenticationService.Instance.IsSignedIn)
+                AuthenticationService.Instance.SignOut(true);
+
+            await WithTimeout(
+                AuthenticationService.Instance.SignInAnonymouslyAsync(),
+                InitTimeoutSeconds,
+                "Anonymous Sign-In");
         }
 
         private static async Task WithTimeout(Task task, int timeoutSeconds, string label)

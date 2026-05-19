@@ -2,6 +2,7 @@ using System;
 using System.Reflection;
 using CoopPuzzle.Gameplay.Core;
 using Unity.Netcode;
+using Unity.Services.Authentication;
 using Unity.Netcode.Transports.UTP;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -111,6 +112,26 @@ namespace CoopPuzzle.Core.Bootstrap
                 networkManager.NetworkConfig.NetworkTransport = unityTransport;
         }
 
+        private void EnsureConnectionApprovalWired()
+        {
+            if (networkManager == null)
+                return;
+
+            networkManager.ConnectionApprovalCallback = OnConnectionApproval;
+        }
+
+        private static void OnConnectionApproval(
+            NetworkManager.ConnectionApprovalRequest request,
+            NetworkManager.ConnectionApprovalResponse response)
+        {
+            var playerId = NetworkConnectionRegistry.DecodePlayerId(request.Payload);
+            response.Approved = true;
+            response.CreatePlayerObject = false;
+            response.Pending = false;
+            response.Reason = string.Empty;
+            NetworkConnectionRegistry.Register(request.ClientNetworkId, playerId);
+        }
+
         public void ConfigureRelay(RelayServerData relayServerData)
         {
             if (unityTransport == null)
@@ -142,10 +163,21 @@ namespace CoopPuzzle.Core.Bootstrap
 
             try
             {
+                NetworkConnectionRegistry.Clear();
+                EnsureConnectionApprovalWired();
+                networkManager.NetworkConfig.ConnectionData =
+                    NetworkConnectionRegistry.EncodePlayerId(AuthenticationService.Instance.PlayerId);
+
                 if (!networkManager.StartHost())
                 {
                     Debug.LogError("[Network] StartHost başarısız. Relay/transport ayarlarını kontrol et.");
                     DetachSceneManagerIfIdle();
+                }
+                else
+                {
+                    NetworkConnectionRegistry.Register(
+                        networkManager.LocalClientId,
+                        AuthenticationService.Instance.PlayerId);
                 }
             }
             catch (Exception ex)
@@ -176,6 +208,10 @@ namespace CoopPuzzle.Core.Bootstrap
 
             try
             {
+                EnsureConnectionApprovalWired();
+                networkManager.NetworkConfig.ConnectionData =
+                    NetworkConnectionRegistry.EncodePlayerId(AuthenticationService.Instance.PlayerId);
+
                 if (!networkManager.StartClient())
                     Debug.LogError("[Network] StartClient başarısız.");
             }
@@ -193,6 +229,20 @@ namespace CoopPuzzle.Core.Bootstrap
         public bool IsConnected =>
             networkManager != null &&
             (networkManager.IsClient || networkManager.IsHost || networkManager.IsServer);
+
+        public bool IsGameplaySceneActive()
+        {
+            var active = SceneManager.GetActiveScene().name;
+            return string.Equals(active, GameplayScenes.Gameplay, StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(active, "GameScene", StringComparison.OrdinalIgnoreCase);
+        }
+
+        public bool IsLobbySceneActive()
+        {
+            var active = SceneManager.GetActiveScene().name;
+            return string.Equals(active, GameplayScenes.Lobby, StringComparison.OrdinalIgnoreCase)
+                   || active.IndexOf("men", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
 
         public bool LoadGameplayScene(string sceneName = null)
         {
@@ -219,6 +269,58 @@ namespace CoopPuzzle.Core.Bootstrap
             var ok = status == SceneEventProgressStatus.Started;
             Debug.Log($"[Network] LoadScene '{sceneName}' → {status} (ok={ok})");
             return ok;
+        }
+
+        public bool LoadLobbyScene()
+        {
+            if (networkManager == null)
+            {
+                Debug.LogError("NetworkManager yok.");
+                return false;
+            }
+
+            if (!networkManager.IsServer)
+            {
+                Debug.LogWarning("Lobby sahnesini yalnızca host yükleyebilir.");
+                return false;
+            }
+
+            if (networkManager.SceneManager == null)
+            {
+                Debug.LogError("NetworkSceneManager yok.");
+                return false;
+            }
+
+            var status = networkManager.SceneManager.LoadScene(GameplayScenes.Lobby, LoadSceneMode.Single);
+            var ok = status == SceneEventProgressStatus.Started;
+            Debug.Log($"[Network] LoadScene '{GameplayScenes.Lobby}' → {status} (ok={ok})");
+            return ok;
+        }
+
+        public void ShutdownNetwork()
+        {
+            ResolveNetworkRefs();
+
+            if (networkManager == null)
+                return;
+
+            if (!networkManager.IsListening && !networkManager.IsHost &&
+                !networkManager.IsClient && !networkManager.IsServer)
+            {
+                DetachSceneManagerIfIdle();
+                return;
+            }
+
+            try
+            {
+                networkManager.Shutdown();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[Network] Shutdown: {ex.Message}");
+            }
+
+            DetachSceneManagerIfIdle();
         }
     }
 }

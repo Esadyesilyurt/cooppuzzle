@@ -200,14 +200,22 @@ namespace CoopPuzzle.EditorTools
         if (lrb != null) Undo.DestroyObjectImmediate(lrb);
 
         var col = leaf.GetComponent<BoxCollider>();
-        if (col != null) col.isTrigger = false;
+        if (col != null)
+          col.isTrigger = false;
+
+        CoopPuzzle.EditorTools.CoopPuzzleDoorBlockingFix.EnsureDoorBlocker(doorRoot);
 
         Undo.AddComponent<DoorQuestionSlot>(doorRoot);
         var door = Undo.AddComponent<DoorInteractable>(doorRoot);
 
+        var blocker = doorRoot.transform.Find("DoorBlocker");
+        var blockerCol = blocker != null ? blocker.GetComponent<Collider>() : null;
+        var obstacle = doorRoot.GetComponent<NavMeshObstacle>();
+
         var dso = new SerializedObject(door);
         dso.FindProperty("questionSlot").objectReferenceValue = doorRoot.GetComponent<DoorQuestionSlot>();
-        dso.FindProperty("blockingCollider").objectReferenceValue = col;
+        dso.FindProperty("blockingCollider").objectReferenceValue = blockerCol;
+        dso.FindProperty("navMeshObstacle").objectReferenceValue = obstacle;
         dso.FindProperty("doorLeaf").objectReferenceValue = leaf.transform;
         dso.ApplyModifiedPropertiesWithoutUndo();
 

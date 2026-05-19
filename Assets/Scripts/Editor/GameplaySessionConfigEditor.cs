@@ -61,7 +61,9 @@ namespace CoopPuzzle.EditorTools
                 return;
             }
 
-            CoopPuzzle.Gameplay.Core.DoorGameplayEvents.RaiseQuestionStarted(door, data);
+            var config = FindSessionConfig();
+            var team = config != null ? config.LocalTeam : CoopPuzzle.Gameplay.Map.SpawnTeam.Team1;
+            CoopPuzzle.Gameplay.Core.DoorGameplayEvents.RaiseQuestionStarted(door, data, team);
             var router = Object.FindAnyObjectByType<GameplayCameraRouter>();
             router?.ApplyRole();
         }

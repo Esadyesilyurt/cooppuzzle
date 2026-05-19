@@ -1529,7 +1529,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 0}
   m_AnchorMax: {x: 1, y: 0}
-  m_AnchoredPosition: {x: -282.47437, y: 262}
+  m_AnchoredPosition: {x: -314, y: 236.7}
   m_SizeDelta: {x: 275.25696, y: 70.22299}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &563706654
@@ -2727,7 +2727,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 0}
   m_AnchorMax: {x: 1, y: 0}
-  m_AnchoredPosition: {x: -282.47437, y: 153}
+  m_AnchoredPosition: {x: -309.4, y: 135.3}
   m_SizeDelta: {x: 275.25696, y: 70.22299}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1599883370
@@ -3014,7 +3014,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "GER\u0130 D\xD6N"
+  m_text: "GER\u0130 "
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 2e498d1c8094910479dc3e1b768306a4, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 2e498d1c8094910479dc3e1b768306a4, type: 2}
@@ -3111,7 +3111,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1844413883
 RectTransform:
   m_ObjectHideFlags: 0
@@ -4638,9 +4638,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1c76b3d2dec25a04aa8fbb8e0d8485df, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LobbyUIManager
-  mainMenuPanel: {fileID: 1035128054}
-  hostPanel: {fileID: 1844413882}
-  joinPanel: {fileID: 2067563399}
 --- !u!114 &2118189598
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4662,7 +4659,12 @@ MonoBehaviour:
   joinRoomCodeInput: {fileID: 2032116450}
   joinPlayerNameInput: {fileID: 871546305}
   hostPlayerDefaultName: Host Oyuncu
+  joinPlayerDefaultName: Oyuncu
   waitingText: Bekleniyor...
+  lobbyCoordinator: {fileID: 0}
+  lobbyUi: {fileID: 0}
+  statusText: {fileID: 0}
+  joinButton: {fileID: 0}
 --- !u!1 &2134049118
 GameObject:
   m_ObjectHideFlags: 0

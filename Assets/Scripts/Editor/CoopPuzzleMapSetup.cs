@@ -146,6 +146,10 @@ namespace CoopPuzzle.EditorTools
                 "• Tools → CoopPuzzle → Map → Create Team1/2 Traveler Spawn\n" +
                 "• Oluşan objeyi sürükleyerek konumlandır (mavi = Gezgin)\n" +
                 "• Bilge spawn YOK — Gezgin'i izler, belge UI (Phase 4)\n\n" +
+                "BİTİŞ ALANI\n" +
+                "• Hedef noktaya git → Create Finish Zone\n" +
+                "• Sarı gizmo ile alanı ayarla (BoxCollider)\n" +
+                "• İlk giren takımın Gezgini kazanır\n\n" +
                 "KAPI\n" +
                 "• Kapı geçidinin önüne Scene görünümünde git\n" +
                 "• Tools → CoopPuzzle → Map → Create Door At Scene View\n" +
@@ -163,6 +167,75 @@ namespace CoopPuzzle.EditorTools
 
         [MenuItem("Tools/CoopPuzzle/Map/Create Team2 Traveler Spawn", false, 21)]
         public static void CreateTeam2TravelerSpawn() => CreateTravelerSpawn(SpawnTeam.Team2);
+
+        [MenuItem("Tools/CoopPuzzle/Map/Create Finish Zone", false, 23)]
+        public static void CreateFinishZone()
+        {
+            if (CoopPuzzleEditorPlayModeGuard.BlockIfPlaying("Create Finish Zone"))
+                return;
+
+            EnsureSceneOpen();
+
+            var existing = Object.FindAnyObjectByType<GameplayFinishZone>(FindObjectsInactive.Include);
+            if (existing != null)
+            {
+                Selection.activeGameObject = existing.gameObject;
+                Debug.Log("[MapSetup] FinishZone zaten var.");
+                return;
+            }
+
+            var gameplayRoot = EnsureGameplayRoot();
+            var markers = EnsureMarkerFolders(gameplayRoot.transform);
+            var pos = GetSceneViewPlacementPosition();
+
+            var go = new GameObject("FinishZone");
+            Undo.RegisterCreatedObjectUndo(go, "Create finish zone");
+            go.transform.SetParent(markers.spawns.parent, false);
+            go.transform.position = pos;
+            go.transform.rotation = Quaternion.identity;
+
+            var box = Undo.AddComponent<BoxCollider>(go);
+            box.isTrigger = true;
+            box.size = new Vector3(5f, 3f, 5f);
+            box.center = new Vector3(0f, 1.5f, 0f);
+
+            var rb = Undo.AddComponent<Rigidbody>(go);
+            rb.isKinematic = true;
+            rb.useGravity = false;
+
+            Undo.AddComponent<GameplayFinishZone>(go);
+
+            Selection.activeGameObject = go;
+            EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
+        }
+
+        [MenuItem("Tools/CoopPuzzle/Map/Snap All Spawns To NavMesh", false, 22)]
+        public static void SnapAllSpawnsToNavMesh()
+        {
+            if (CoopPuzzleEditorPlayModeGuard.BlockIfPlaying("Snap spawns"))
+                return;
+
+            var snapped = 0;
+            var failed = new System.Collections.Generic.List<string>();
+            foreach (var sp in Object.FindObjectsByType<GameplaySpawnPoint>(FindObjectsInactive.Include))
+            {
+                Undo.RecordObject(sp, "Bake spawn");
+                sp.BakeSpawnPosition();
+
+                if (GameplaySpawnService.IsMarkerOnNavMesh(sp.GetSpawnPosition(), 0.35f))
+                    snapped++;
+                else
+                    failed.Add(sp.name);
+            }
+
+            EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
+
+            var msg = $"Bake edilen spawn: {snapped}";
+            if (failed.Count > 0)
+                msg += $"\n\nUyarı — marker'ı Scene'de yeşil NavMesh üstüne taşı, tekrar Snap:\n• {string.Join("\n• ", failed)}";
+
+            EditorUtility.DisplayDialog("CoopPuzzle", msg, "OK");
+        }
 
         [MenuItem("Tools/CoopPuzzle/Map/Remove Obsolete Sage Spawn Markers", false, 22)]
         public static void RemoveObsoleteSageSpawns()
@@ -203,6 +276,14 @@ namespace CoopPuzzle.EditorTools
         private static void CreateTravelerSpawn(SpawnTeam team)
         {
             EnsureSceneOpen();
+            var existing = FindTravelerSpawn(team);
+            if (existing != null)
+            {
+                Selection.activeGameObject = existing.gameObject;
+                Debug.Log($"[MapSetup] {team} spawn zaten var: {existing.name}");
+                return;
+            }
+
             var gameplayRoot = EnsureGameplayRoot();
             var folders = EnsureMarkerFolders(gameplayRoot.transform);
             var pos = GetSceneViewPlacementPosition();
@@ -215,6 +296,7 @@ namespace CoopPuzzle.EditorTools
 
             var sp = Undo.AddComponent<GameplaySpawnPoint>(go);
             sp.Configure(team);
+            sp.BakeSpawnPosition();
 
             Selection.activeGameObject = go;
             EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
@@ -238,14 +320,22 @@ namespace CoopPuzzle.EditorTools
             if (lrb != null) Undo.DestroyObjectImmediate(lrb);
 
             var col = leaf.GetComponent<BoxCollider>();
-            if (col != null) col.isTrigger = false;
+            if (col != null)
+                col.isTrigger = false;
+
+            CoopPuzzleDoorBlockingFix.EnsureDoorBlocker(doorRoot);
 
             Undo.AddComponent<DoorQuestionSlot>(doorRoot);
             var door = Undo.AddComponent<DoorInteractable>(doorRoot);
 
+            var blocker = doorRoot.transform.Find("DoorBlocker");
+            var blockerCol = blocker != null ? blocker.GetComponent<Collider>() : null;
+            var obstacle = doorRoot.GetComponent<NavMeshObstacle>();
+
             var dso = new SerializedObject(door);
             dso.FindProperty("questionSlot").objectReferenceValue = doorRoot.GetComponent<DoorQuestionSlot>();
-            dso.FindProperty("blockingCollider").objectReferenceValue = col;
+            dso.FindProperty("blockingCollider").objectReferenceValue = blockerCol;
+            dso.FindProperty("navMeshObstacle").objectReferenceValue = obstacle;
             dso.FindProperty("doorLeaf").objectReferenceValue = leaf.transform;
             dso.FindProperty("interactDistance").floatValue = 3f;
             dso.ApplyModifiedPropertiesWithoutUndo();

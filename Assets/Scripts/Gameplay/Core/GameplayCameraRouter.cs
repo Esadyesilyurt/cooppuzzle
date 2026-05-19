@@ -1,3 +1,4 @@
+using CoopPuzzle.Gameplay.Camera;
 using CoopPuzzle.Gameplay.Player;
 using CoopPuzzle.Gameplay.Sage;
 using CoopPuzzle.Gameplay.UI;
@@ -25,6 +26,8 @@ namespace CoopPuzzle.Gameplay.Core
             if (session == null)
                 session = GameplaySessionConfig.Instance;
 
+            ResolveCamerasByName();
+
             if (travelerQuestionUI == null)
                 travelerQuestionUI = FindAnyObjectByType<GameplayQuestionUI>();
 
@@ -35,7 +38,86 @@ namespace CoopPuzzle.Gameplay.Core
                 sageDocumentFlow = FindAnyObjectByType<SageDocumentFlowController>();
         }
 
-        private void Start() => ApplyRole();
+        private void Start()
+        {
+            ApplyRole();
+            TryBindLocalNetworkTraveler();
+        }
+
+        /// <summary>Inspector'da ters bağlanmış kameraları isimle düzeltir.</summary>
+        private void ResolveCamerasByName()
+        {
+            UnityEngine.Camera gameplayCam = null;
+            UnityEngine.Camera sageCam = null;
+
+            foreach (var cam in FindObjectsByType<UnityEngine.Camera>(FindObjectsInactive.Include))
+            {
+                if (cam == null)
+                    continue;
+
+                if (cam.gameObject.name == "GameplayCamera")
+                    gameplayCam = cam;
+                else if (cam.gameObject.name == "SageCamera")
+                    sageCam = cam;
+            }
+
+            if (gameplayCam != null)
+                travelerCamera = gameplayCam;
+
+            if (sageCam != null)
+                sageCamera = sageCam;
+        }
+
+        /// <summary>Spawn sonrası yerel Gezgin kamerasını PlayerObject'e bağlar.</summary>
+        public void TryBindLocalNetworkTraveler()
+        {
+            if (session == null || session.LocalRole != GameplayRole.Traveler)
+                return;
+
+            var localTraveler = LocalPlayerLookup.GetLocalTraveler();
+            if (localTraveler == null)
+                return;
+
+            SetTravelerCameraTarget(localTraveler.transform);
+            BindLocalTraveler(localTraveler.GetComponent<TravelerTouchInput>());
+        }
+
+        public UnityEngine.Camera TravelerCamera => travelerCamera;
+
+        public UnityEngine.Camera SageCamera => sageCamera;
+
+        public void BindLocalTraveler(TravelerTouchInput input)
+        {
+            if (input != null)
+            {
+                travelerInput = input;
+                if (travelerCamera != null)
+                    input.SetInputCamera(travelerCamera);
+            }
+
+            ApplyRole();
+        }
+
+        public void SetTravelerCameraTarget(Transform target)
+        {
+            if (travelerCamera == null)
+                return;
+
+            var follow = travelerCamera.GetComponent<TopDownCameraFollow>();
+            if (follow != null)
+                follow.SetTarget(target);
+        }
+
+        public void ClearTravelerCameraTarget() => SetTravelerCameraTarget(null);
+
+        public void SetSageCameraTarget(Transform target)
+        {
+            if (target == null || sageCamera == null)
+                return;
+
+            var follow = sageCamera.GetComponent<TopDownCameraFollow>();
+            follow?.SetTarget(target);
+        }
 
         public void ApplyRole()
         {
@@ -51,7 +133,10 @@ namespace CoopPuzzle.Gameplay.Core
                 sageCamera.enabled = !isTraveler;
 
             if (travelerInput != null)
-                travelerInput.enabled = isTraveler;
+            {
+                var netTraveler = travelerInput.GetComponent<NetworkTravelerController>();
+                travelerInput.enabled = isTraveler && (netTraveler == null || netTraveler.IsLocallyControlled);
+            }
 
             SetCanvasEnabled(travelerQuestionUI, isTraveler);
             SetCanvasEnabled(sageDocumentUI, !isTraveler);
@@ -76,3 +161,4 @@ namespace CoopPuzzle.Gameplay.Core
         }
     }
 }
+

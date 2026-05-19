@@ -1,7 +1,6 @@
 using CoopPuzzle.Gameplay.Core;
 using CoopPuzzle.Gameplay.Doors;
 using CoopPuzzle.Gameplay.Map;
-using CoopPuzzle.Gameplay.Player;
 using CoopPuzzle.Gameplay.Questions;
 using CoopPuzzle.Questions;
 using UnityEngine;
@@ -63,21 +62,21 @@ namespace CoopPuzzle.Gameplay.Sage
         ShowMasterDocument(doorActiveHint);
     }
 
-    private void OnTravelerQuestionStarted(DoorInteractable door, QuestionData data)
+    private void OnTravelerQuestionStarted(DoorInteractable door, QuestionData data, SpawnTeam travelerTeam)
     {
-      if (!ShouldReactToDoor(door))
+      if (!ShouldReactToTeam(travelerTeam))
         return;
 
       if (focusDocumentWhenTravelerAtDoor)
         ShowMasterDocument(doorActiveHint);
     }
 
-    private void OnTravelerQuestionEnded(DoorInteractable door)
+    private void OnTravelerQuestionEnded(DoorInteractable door, SpawnTeam travelerTeam)
     {
       if (session == null || session.LocalRole != GameplayRole.Sage)
         return;
 
-      if (!IsWatchingTravelerDoor(door))
+      if (!ShouldReactToTeam(travelerTeam))
         return;
 
       if (closeDocumentWhenQuestionEnds)
@@ -112,43 +111,18 @@ namespace CoopPuzzle.Gameplay.Sage
       documentUI?.Show(masterDocument.Title, masterDocument.GetBody(), hint);
     }
 
-    private bool ShouldReactToDoor(DoorInteractable door)
+    private bool ShouldReactToTeam(SpawnTeam travelerTeam)
     {
       if (session == null || session.LocalRole != GameplayRole.Sage)
         return false;
 
-      return IsWatchingTravelerDoor(door);
+      return travelerTeam == watchTeam;
     }
 
     private bool IsTravelerQuestionActive()
     {
       var questionFlow = FindAnyObjectByType<QuestionFlowController>();
       return questionFlow != null && questionFlow.ActiveDoor != null;
-    }
-
-    private bool IsWatchingTravelerDoor(DoorInteractable door)
-    {
-      var traveler = FindTeamTraveler(watchTeam);
-      if (traveler == null || door == null)
-        return true;
-
-      var marker = traveler.GetComponent<TravelerTeamMarker>();
-      if (marker != null && marker.Team != watchTeam)
-        return false;
-
-      return true;
-    }
-
-    private static TravelerMovementController FindTeamTraveler(SpawnTeam team)
-    {
-      foreach (var t in FindObjectsByType<TravelerMovementController>(FindObjectsInactive.Exclude))
-      {
-        var marker = t.GetComponent<TravelerTeamMarker>();
-        if (marker == null || marker.Team == team)
-          return t;
-      }
-
-      return null;
     }
 
     public void SetWatchTeam(SpawnTeam team) => watchTeam = team;

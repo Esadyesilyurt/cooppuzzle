@@ -7,6 +7,50 @@ namespace CoopPuzzle.Lobby
 {
     public static class LobbyRoleAssignment
     {
+        public static bool TryGetRoleForLobbyPlayer(Unity.Services.Lobbies.Models.Player player, out GameplayRole role)
+        {
+            role = GameplayRole.Traveler;
+            if (player == null)
+                return false;
+
+            var slot = LobbySlotLayout.GetSlotIndexForPlayer(player);
+            if (slot < 0)
+                slot = 0;
+
+            if (player.Data != null
+                && player.Data.TryGetValue(LobbyConstants.RoleKey, out var roleObj)
+                && TryParseRole(roleObj.Value, out var parsedRole))
+            {
+                role = parsedRole;
+                return true;
+            }
+
+            role = GetDefaultRoleForSlot(slot);
+            return true;
+        }
+
+        public static bool TryGetTeamForLobbyPlayer(Unity.Services.Lobbies.Models.Player player, out SpawnTeam team)
+        {
+            team = SpawnTeam.Team1;
+            if (player == null)
+                return false;
+
+            var slot = LobbySlotLayout.GetSlotIndexForPlayer(player);
+            if (slot < 0)
+                slot = 0;
+
+            if (player.Data != null
+                && player.Data.TryGetValue(LobbyConstants.TeamKey, out var teamObj)
+                && TryParseTeam(teamObj.Value, out var parsedTeam))
+            {
+                team = parsedTeam;
+                return true;
+            }
+
+            team = GetDefaultTeamForSlot(slot);
+            return true;
+        }
+
         public static void ApplyLocalRoleFromLobby(GameplaySessionConfig config)
         {
             if (config == null) return;
@@ -24,7 +68,9 @@ namespace CoopPuzzle.Lobby
 
             var localId = AuthenticationService.Instance.PlayerId;
             var localPlayer = lobby.Players.Find(p => p.Id == localId);
-            var index = localPlayer != null ? lobby.Players.IndexOf(localPlayer) : 0;
+            var slot = localPlayer != null ? LobbySlotLayout.GetSlotIndexForPlayer(localPlayer) : 0;
+            if (slot < 0)
+                slot = 0;
 
             if (localPlayer?.Data != null
                 && localPlayer.Data.TryGetValue(LobbyConstants.RoleKey, out var roleObj)
@@ -34,7 +80,7 @@ namespace CoopPuzzle.Lobby
             }
             else
             {
-                config.SetLocalRole(GetDefaultRoleForSlot(index));
+                config.SetLocalRole(GetDefaultRoleForSlot(slot));
             }
 
             if (localPlayer?.Data != null
@@ -45,10 +91,10 @@ namespace CoopPuzzle.Lobby
             }
             else
             {
-                config.SetLocalTeam(GetDefaultTeamForSlot(index));
+                config.SetLocalTeam(GetDefaultTeamForSlot(slot));
             }
 
-            Debug.Log($"[LobbyRole] Slot {index} → {config.LocalTeam} / {config.LocalRole}");
+            Debug.Log($"[LobbyRole] Slot {slot} → {config.LocalTeam} / {config.LocalRole}");
         }
 
         private static GameplayRole GetDefaultRoleForSlot(int index) =>

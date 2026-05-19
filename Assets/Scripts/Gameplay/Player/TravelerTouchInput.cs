@@ -21,6 +21,12 @@ namespace CoopPuzzle.Gameplay.Player
 
         private QuestionFlowController _questionFlow;
 
+        public void SetInputCamera(UnityEngine.Camera camera)
+        {
+            if (camera != null)
+                inputCamera = camera;
+        }
+
         private void Awake()
         {
             if (inputCamera == null)
@@ -53,7 +59,7 @@ namespace CoopPuzzle.Gameplay.Player
             var door = hit.collider.GetComponentInParent<DoorInteractable>();
             if (door != null)
             {
-                door.TryInteractFromTraveler(transform.position);
+                door.TryInteractFromTraveler(transform);
                 return;
             }
 
