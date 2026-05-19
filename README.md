@@ -12,6 +12,24 @@ An online, team-based knowledge race. Two teams (Traveler + Sage) explore a shar
 
 ---
 
+## What I Did (Individual Contributions)
+
+*   **Esad Yeşilyurt:** 
+    *   Developed the core game loop and networked logic using Netcode for GameObjects.
+    *   Scripted the Traveler movement, interaction mechanics, and door challenge triggers.
+    *   Integrated Unity Gaming Services (Lobby & Relay) for seamless multiplayer matchmaking.
+*   **Bünyamin Aslan:** 
+    *   Designed and implemented the Start Menu, Lobby interfaces, and the final Win/Loss screens.
+    *   Created the in-game UI, including the Sage's master document interface and the interactive question pop-ups for the Traveler.
+*   **Muhammed Raşit Algan:** 
+    *   Created 3D models for the environment, including the shared map layout, interactive doors, and the finish zone.
+    *   Designed and integrated the visual assets for the Traveler and Sage character representations.
+*   **Kayra Cem Gökmen:** 
+    *   Designed and integrated sound effects and audio feedback (e.g., correct/wrong answer sounds, UI clicks).
+    *   Authored the educational questions and configured the `QuestionData` system to populate the door challenges in the editor.
+
+---
+
 ## Educational Concept
 
 ### Pedagogical goal
